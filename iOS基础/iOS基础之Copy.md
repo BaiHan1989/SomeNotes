@@ -56,7 +56,7 @@
 
 本质如图：
 
-<img src="/Users/bh/Documents/我的文章/iOS底层原理/把copy聊透/image-20210531162213159.png" alt="image-20210531162213159" style="zoom:50%;" />
+![image-20210531162213159](https://user-images.githubusercontent.com/17879178/132788889-103914ef-68ba-4428-8a6b-c46492e9780a.png)
 
 - `str1` 和 `st2` 都指向了同一个对象，`str3` 指向了另外一个对象。
 - 为什么会出现这样的现象呢？因为正常情况下调用 `copy` 方法会返回一个**不可变对象**，而调用 `mutableCopy` 方法会返回一个**可变对象**。
@@ -100,7 +100,8 @@
 
 画图分析：
 
-<img src="/Users/bh/Documents/我的文章/iOS底层原理/把copy聊透/image-20210531162851567.png" alt="image-20210531162851567" style="zoom:50%;" />
+![image-20210531162851567](https://user-images.githubusercontent.com/17879178/132789062-1acd56ab-7383-441b-8b96-4e7136a01372.png)
+
 
 - `st1` 是指向的是可变字符串，可以进行修改
 - `str1` 调用 `copy` 方法会重新创建一个新的不可变字符串，是深拷贝，因为当 `str1` 进行修改的时候，`str2` 中的值不会受到任何的影响
@@ -277,9 +278,10 @@ _str = [str retain]; // 最关键的地方
 
 如果你还不懂，再画个图给你解释：
 
-<img src="/Users/bh/Documents/我的文章/iOS底层原理/把copy聊透/image-20210531163425771.png" alt="image-20210531163425771" style="zoom:50%;" />
+![image-20210531163425771](https://user-images.githubusercontent.com/17879178/132789103-7b234bac-25a0-4555-a5a0-b2eafdbc7571.png)
 
-<img src="/Users/bh/Documents/我的文章/iOS底层原理/把copy聊透/image-20210531163441028.png" alt="image-20210531163441028" style="zoom:50%;" />
+
+![image-20210531163441028](https://user-images.githubusercontent.com/17879178/132789114-5ab04da7-e741-450e-9612-c02ac18424b9.png)
 
 ### 3.2 问题2
 
