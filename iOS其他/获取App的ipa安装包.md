@@ -39,13 +39,21 @@
 
 <img width="463" alt="image-20201010154314458" src="https://user-images.githubusercontent.com/17879178/132791193-7d6ef03d-4d50-4dee-9e89-a81685113067.png">
 
-- **重点：**下载完成后，会弹出如下界面，**此时什么都不要操作！**，**此时什么都不要操作！**，**此时什么都不要操作！**弹出这个界面说明App已经下载到我们的磁盘上了，接下来就是要找到它了。
+- **重点：** 下载完成后，会弹出如下界面：
+- **此时什么都不要操作！！！**
+- **此时什么都不要操作！！！**
+- **此时什么都不要操作！！！**
+- 弹出这个界面说明App已经下载到我们的磁盘上了，接下来就是要找到它了。
+
+
 
 <img width="434" alt="image-20201010154450067" src="https://user-images.githubusercontent.com/17879178/132791209-7a5f10ab-9c6c-4bb9-8354-cf0e3fa3bcb7.png">
 
 - 下载的路径：`~/Library/Group Containers/K36BKF7T3D.group.com.apple.configurator/Library/Caches/Assets/TemporaryItems/MobileApps`
 
 > 波浪号(~)不要丢！！！，一路点下去，就可以找到，懂车帝xxx.ipa。将ipa复制出来即可。
+>
+> 或者 在 Finder 激活的情况下，使用 快捷键 Command + Shift + G，跳转到该路径
 
 - 回到Apple Configurator 2应用程序，点击**停止**。
 
