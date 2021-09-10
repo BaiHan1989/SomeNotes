@@ -8,7 +8,7 @@
 
 一个应用程序的运行可以参照下图：
 
-<img src="/Users/bh/Documents/我的文章/iOS底层原理/iOS基础之Runloop/runloop.png" alt="runloop" style="zoom:50%;" />
+![runloop](https://user-images.githubusercontent.com/17879178/132788249-3cde7aca-062a-4c48-a9c4-ba996691a9b6.png)
 
 ## 二、RunLoop 对象
 
