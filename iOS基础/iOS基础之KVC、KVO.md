@@ -131,7 +131,9 @@ int main(int argc, const char * argv[]) {
 
 ## 二、KVO
 
-`KVO` 即键值观察，可以用来监听一个对象的属性的变化，当该对象的属性的值发生改变的时候，会回调 `- (void)observeValueForKeyPath:ofObject:change:context: ` 方法，在该方法中可以处理一些业务逻辑。
+`KVO` 全称是 `KeyValueObserving` ，中文名称时键值观察，是苹果提供的一套事件通知机制。可以用一个对象来监听另外一个对象的属性的改变，当该对象的属性的值发生改变的时候，可以对属性变化进行监听。
+
+`KVO` 和 `NSNotificationCenter` 都是 `iOS` 中观察者模式的一种实现。他们的区别在于相对于被观察者和观察者之间的关系，`KVO` 是一对一的，而 `NSNotificationCenter` 是可以一对多的。
 
 `KVO` 的一些实现细节可以查看这个文档：[KVO的实现细节](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueObserving/Articles/KVOImplementation.html)
 
@@ -139,22 +141,25 @@ int main(int argc, const char * argv[]) {
 
 ### 2.1 KVO 的基本使用
 
-```objective-c
-// Person.h
-#import <Foundation/Foundation.h>
+`KVO` 的使用分为3个步骤
 
-@interface Person : NSObject
-@property (nonatomic, assign) int age;
-@end
-  
-// ViewController.m
-  
+1. 通过 `addObserver:forKeyPath:options:context:` 方法注册观察者，观察者可以监听 `keyPath` 属性变化的回调
+2. 在观察者中实现 `observeValueForKeyPath:ofObject:change:context:` 方法，当被监听的属性发生改变后，会回调该方法
+3. 当观察者不需要监听时，可以调用 `removeObserver:forKeyPath:` 方法将观察者进行移除，在观察者对象销毁之前调用 `removeObserver:forKeyPath:` 方法，否则会程序会崩溃
+
+eg:
+
+- 定义一个 `KVOPerson` 类，`KVOPerson` 包含一个 `age` 属性
+- 创建两个 `person` 对象，其中 `person1` 不做任何监听，`person2` 添加 `KVO` 监听，监听 `age` 属性的改变
+- 点击控制器的 `view` 来修改 `person` 的 `age` 属性的值
+
+```objective-c
 #import "ViewController.h"
-#import "Person.h"
+#import "KVOPerson.h"
 
 @interface ViewController ()
-@property (nonatomic, strong) Person *person1;
-@property (nonatomic, strong) Person *person2;
+@property (nonatomic, strong) KVOPerson *person1;
+@property (nonatomic, strong) KVOPerson *person2;
 @end
 
 @implementation ViewController
@@ -162,90 +167,112 @@ int main(int argc, const char * argv[]) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    self.person1 = [[Person alloc] init];
-    self.person1.age = 11;
+    self.person1 = [[KVOPerson alloc] init];
+    self.person1.age = 18;
     
-    self.person2 = [[Person alloc] init];
-    self.person2.age= 22;
+    self.person2 = [[KVOPerson alloc] init];
+    self.person2.age = 29;
     
-    NSKeyValueObservingOptions options = NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld;
-    [self.person1 addObserver:self forKeyPath:@"age" options:options context:@"man"];
+    // 监听 person2 的 age 属性值的改变
+    [self.person2 addObserver:self forKeyPath:@"age" options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:@"some person"];
     
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    self.person1.age = 18;
-    self.person2.age = 33;
+    // 点击控制器的 view 来改变属性的值
+    self.person1.age = 38;
+    self.person2.age = 46;
+  
+  	// 通过 setter 方法给 age 属性赋值
+    [self.person1 setAge:38];
+    [self.person2 setAge:46];
+  
+    // 通过 KVC 的方式给 age 属性赋值
+    [self.person1 setValue:@38 forKey:@"age"];
+    [self.person2 setValue:@46 forKey:@"age"];
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context {
     
-    NSLog(@"%@的%@属性改变了 - %@ - %@", object, keyPath, change, context);
+    NSLog(@"keyPath：%@，object：%@，change：%@，context：%@", keyPath, object, change, context);
 }
 
 - (void)dealloc {
-    [self.person1 removeObserver:self forKeyPath:@"age"];
+    // 移除监听
+    [self.person2 removeObserver:self forKeyPath:@"status"];
 }
-
+@end
+  
 // 打印结果：
-<Person: 0x6000019a8270>的age属性改变了 - {
+// 点击控制器的 view，打印新值和旧值，以及传递过来的 context 的值，属性是 age
+2021-11-30 14:05:58.597294+0800 KVODemo[4888:1605565] keyPath：age，object：<KVOPerson: 0x6000011cca10>，change：{
     kind = 1;
-    new = 18;
-    old = 11;
-} - man
+    new = 46;
+    old = 29;
+}，context：some person
+
 ```
 
-- 创建一个 `Person` 类，定义一个 `age` 属性，定义属性后，编译器会自动生成 `getter` 和 `setter` 方法以及带下划线的成员变量
-- 创建两个 `person` 对象，分别给 `age` 属性赋值（本质是调用 `setAge:` 方法）同时给 `person1` 添加观察者 `self` （即该控制器对象）
-- 监听 `age` 属性，监听它的新值和旧值
-- 实现  `- (void)observeValueForKeyPath:ofObject:change:context: ` 方法，当 `age` 发生改变后会回调到该方法。
-- 在控制器对象销毁时候，将 person1 的观察者移除
+- 使用点语法、`setter` 方法和`KVC` 的方式均可以触发 `KVO`
+- 直接修改成员变量的值是不会触发 `KVO` 的
+- 如果想要手动触发 `KVO`，需要调用两个方法，`willChangeValueForKey:` 和 `didChangeValueForKey:` ，只调用其中任意一个都不会触发 `KVO`，两个方法的调用顺序也不能修改。
+
+```objective-c
+- (void)manualKVO {
+    [self willChangeValueForKey:@"age"];
+    _age = 46;
+    [self didChangeValueForKey:@"age"];
+    
+}
+```
+
+- 禁用 `KVO`，**注意手动触发 `KVO` 不会被禁用方法影响**
+
+```objective-c
+/// 可以根据实际的业务来禁用 KVO
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key {
+    
+    if ([key isEqualToString:@"age"]) {
+        return YES;
+    }
+    
+    return NO;
+}
+```
+
+
 
 以上就是 `KVO` 的基本使用。接下来我们就研究一下 `KVO` 的本质
 
-### 2.2 KVO 的本质
+### 2.2 KVO 的本质（实现原理）
 
 上面的代码，我们改变 `age` 的值，本质是调用 `setter` 方法进行 `age` 的值修改，我们可能会认为程序在运行时 `setter` 方法做了手脚来实现监听，其实不是的，问题出在 `person` 对象上。
 
 我们可以通过在为 `person1` 添加观察者之后来打印一下 `person1` 和 `person2` 的 `isa` 指向来获取他们的类对象
 
 ```objective-c
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    
-    self.person1 = [[Person alloc] init];
-    self.person1.age = 11;
-    
-    self.person2 = [[Person alloc] init];
-    self.person2.age= 22;
-    
-    NSKeyValueObservingOptions options = NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld;
-    [self.person1 addObserver:self forKeyPath:@"age" options:options context:@"man"];
-    
-  	// 获取类对象
-    NSLog(@"%@", object_getClass(self.person1));
-    NSLog(@"%@", object_getClass(self.person2));
-    
-}
+// 获取 person 对象的类对象
+NSLog(@"%@", object_getClass(self.person1));
+NSLog(@"%@", object_getClass(self.person2));
 
 // 打印结果：
-NSKVONotifying_Person
-Person
+KVOPerson
+NSKVONotifying_KVOPerson
 ```
 
-- `person1` 对象的 `isa` 指向发生了变化，指向了 `NSKVONotifying_Person`，`NSKVONotifying_Person`就是 `person1` 的类对象
-- `person2` 进行 `KVO` 监听，所以 `person2` 的 `isa` 指向没有改变
+- `person2` 对象的 `isa` 指向发生了变化，指向了 `NSKVONotifying_KVOPerson`，`NSKVONotifying_KVOPerson`就是 `person2` 的类对象
+- `person1` 没有进行 `KVO` 监听，所以 `person1` 的 `isa` 指向没有改变，还是 `KVOPerson`
 
 `NSKVONotifying_Person` 是在程序运行时为我们动态添加的类，而该类是继承 `Person` 的，即它的 `superclass` 指针指向了 `Person`，调用下面的代码可以验证该结论。
 
 ```objective-c
-NSLog(@"%@", [object_getClass(self.person1) superclass]);
-// 打印结果：Person
+NSLog(@"%@", [object_getClass(self.person2) superclass]);
+// 打印结果：KVOPerson
 ```
 
-KVO 又是怎么对 person1 的 age 属性进行监听的呢？
+`KVO` 又是怎么对 `person2` 的 `age` 属性进行监听的呢？
 
-- `person1` 通过  `isa`找到它的类对象即 `NSKVONotifying_Person`，在 `NSKVONotifying_Person`内部也存储着一个 `setAge:` 方法，该方法内部调用了 `_NSSetIntValueAndNotify` 函数
+- `person2` 通过  `isa` 指针找到它的类对象即 `NSKVONotifying_KVOPerson`，在 `NSKVONotifying_KVOPerson`内部也存储着一个 `setAge:` 方法，该方法内部调用了 `_NSSetIntValueAndNotify` 函数
 - `_NSSetIntValueAndNotify` 函数内部首先是调用了 `- (void)willChangeValueForKey:` 方法，然后通过 `[super setAge:]` 方法去调用父类真正的赋值操作，最后调用 `- (void)didChangeValueForKey:` 方法
 - 在 `- (void)didChangeValueForKey:` 内部调用`- (void)observeValueForKeyPath:ofObject:change:context: `方法最终完成属性值的监听操作。
 
@@ -255,29 +282,28 @@ KVO 又是怎么对 person1 的 age 属性进行监听的呢？
 
 ```objective-c
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    self.person1.age = 18;
-    self.person2.age = 33;
+    self.person1.age = 38;
+    self.person2.age = 46;
   	// 打印方法的地址
     NSLog(@"%p", [self.person1 methodForSelector:@selector(setAge:)]);
     NSLog(@"%p", [self.person2 methodForSelector:@selector(setAge:)]);
 }
 
 // 打印结果：
-0x7fff207bc2b7
-0x108a0ef30
+0x10ec9ec60
+0x10fcb7963
 
 lldb:
-p (IMP)0x7fff207bc2b7 => $0 = 0x00007fff207bc2b7 (Foundation`_NSSetIntValueAndNotify)
-p (IMP)0x108a0ef30 		=> $2 = 0x0000000108a0ef30 (KVODemo`-[Person setAge:] at Person.h:13)
+p (IMP)0x10ec9ec60 => (IMP) $0 = 0x000000010ec9ec60 (KVODemo`-[KVOPerson setAge:] at KVOPerson.h:14)
+p (IMP)0x10fcb7963 => (IMP) $1 = 0x000000010fcb7963 (Foundation`_NSSetIntValueAndNotify)
 ```
 
 我们可以通过一些打印来观察一下具体是什么时候进行监听的：
 
-```objective-c
-// Person.m
-#import "Person.h"
+- 重写 `KVOPerson` 对象的 `setter` 方法、`willChangeValueForKey:` 方法以及 `didChangeValueForKey:` 方法
 
-@implementation Person
+```objective-c
+@implementation KVOPerson
 
 - (void)setAge:(int)age {
     _age = age;
@@ -300,24 +326,23 @@ p (IMP)0x108a0ef30 		=> $2 = 0x0000000108a0ef30 (KVODemo`-[Person setAge:] at Pe
 @end
 
 // 打印结果：
-willChangeValueForKey:
-setAge:
-didChangeValueForKey: => begin
-<Person: 0x600000aac460>的age属性改变了 - {
+2021-11-30 16:21:25.967637+0800 KVODemo[14349:1727809] willChangeValueForKey:
+2021-11-30 16:21:25.967851+0800 KVODemo[14349:1727809] setAge:
+2021-11-30 16:21:25.967993+0800 KVODemo[14349:1727809] didChangeValueForKey: => begin
+2021-11-30 16:21:25.968538+0800 KVODemo[14349:1727809] keyPath：age，object：<KVOPerson: 0x600001024740>，change：{
     kind = 1;
-    new = 18;
-    old = 11;
-} - man
-didChangeValueForKey: => end
+    new = 46;
+    old = 0;
+}，context：some person
+2021-11-30 16:21:25.968802+0800 KVODemo[14349:1727809] didChangeValueForKey: => end
 ```
 
-- 重写 `Person.m` 文件中的 `setAge:` 方法、`willChangeValueForKey:` 方法以及 `didChangeValueForKey:` 方法
 - 通过打印结果可以观察打印顺序，先调用 `willChangeValueForKey:` 再调用 `setAge:` 方法去修改值，最后再 `didChangeForKey:` 方法中来监听属性的改变
 
-前面已经得出结论，`person1` 的类对象已经变成了 `NSKVONotifying_Person` 类，而且 `NSKVONotifying_Person` 中还重写了 `setAge` 方法，其实内部不仅仅有 `setAge` 方法，还有三个方法，分别为 `class`，`dealloc` 方法和 `_isKVOA` 方法。
+前面已经得出结论，`person2` 的类对象已经变成了 `NSKVONotifying_KVOPerson` 类，而且 `NSKVONotifying_KVOPerson` 中还重写了 `setAge` 方法，其实内部不仅仅有 `setAge` 方法，还有三个方法，分别为 `class`，`dealloc` 方法和 `_isKVOA` 方法。
 
-- 重写 `class` 方法的目的是当我们调用 `[person1 class]` 方法时，返回的是 `Person` 类，从而防止 `NSKVONotifying_Person` 类暴露出来，因为苹果本身是不希望我们去过多关注 `NSKVONotifying_Person` 类的。
-- `dealloc` 方法在 `NSKVONotifying_Person` 类使用完毕后进行一些收尾的工作，因为是不开源的所以这里也只是一个猜测
+- 重写 `class` 方法的目的是当我们调用 `[person2 class]` 方法时，返回的是 `Person` 类，从而防止 `NSKVONotifying_Person` 类暴露出来，因为苹果本身是不希望我们去过多关注 `NSKVONotifying_Person` 类的。
+- `dealloc` 方法在 `NSKVONotifying_KVOPerson` 类使用完毕后进行一些收尾的工作，因为是不开源的所以这里也只是一个猜测
 - `_isKVOA` 方法目的是返回布尔类型告诉系统是否和 `KVO` 有关。
 
 我们可以利用 runtime 来查看一个类对象中的方法名称：
@@ -344,14 +369,14 @@ didChangeValueForKey: => end
     return methodNames;
 }
 
-NSLog(@"%@ - %@", object_getClass(self.person1), [self printMethodNameOfClass:object_getClass(self.person1)]);
 NSLog(@"%@ - %@", object_getClass(self.person2), [self printMethodNameOfClass:object_getClass(self.person2)]);
+NSLog(@"%@ - %@", object_getClass(self.person1), [self printMethodNameOfClass:object_getClass(self.person1)]);
 
 // 打印结果：
-NSKVONotifying_Person - setAge: class dealloc _isKVOA
-Person - setAge: age
+2021-11-30 16:27:12.413192+0800 KVODemo[14748:1734276] NSKVONotifying_KVOPerson - setAge: class dealloc _isKVOA
+2021-11-30 16:27:12.413364+0800 KVODemo[14748:1734276] KVOPerson - manualKVO willChangeValueForKey: didChangeValueForKey: age setAge:
 ```
 
+`KVO` 的实现原理利用 `isa-swizzling` 技术实现的，在运行时对 `isa` 的指向进行了修改。
 
-
-## 修改时间：2021年5月19日
+## 修改时间：2021年11月30日
