@@ -4,7 +4,7 @@
 
 ## 二、OC对象的本质
 
-创建一个`NSObject`对象，使用`obj`指针指向了这个对象。
+创建一个 `NSObject` 对象，使用 `obj` 指针指向了这个对象。
 
 ```objective-c
 int main(int argc, const char * argv[]) {
@@ -15,7 +15,7 @@ int main(int argc, const char * argv[]) {
 }
 ```
 
-我们可以利用 `clang` 编译器将 Objective-C 代码转换成 C/C++ 代码，转换成的代码是编译后的 C/C++ 代码，本质并不是运行时的代码，但也可以帮助我们探究一下底层的实现
+我们可以利用 `clang` 编译器将 `Objective-C` 代码转换成 `C/C++` 代码，转换成的代码是编译后的 `C/C++` 代码，本质并不是运行时的代码，但也可以帮助我们探究一下底层的实现
 - 打开终端，来到目标源文件所在目录，执行下面的命令，执行结束得到输出的 CPP 文件。
 
 ```shell
@@ -25,14 +25,14 @@ xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc 目标OC源文件 -o 输出�
 xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc main.m -o mani-arm64.cpp
 ```
 
-- 我们通过Xcode进入`NSObject`的声明文件中，看下`NSObject`是如何定义的
-  - 在 `NSObject`的定义中，有成员即`isa`，是`Class`类型的
-  - `Class`是通过关键字`typedef`重新命名的类型，可以看出`Class`类型本质就是`struct objc_class *`类型，即指向结构体的指针，也就是说`isa`就是一个指向结构体的**指针**
-  - 每个对象的内部都会有一个 `isa` 指针
+- 我们也可以通过 Xcode 进入 `NSObject` 的声明文件(.h文件)中，看下 `NSObject` 是如何定义的
+  - 在  `NSObject` 的定义中，有一个成员变量即 `isa` ，是 `Class` 类型的
+  - 而 `Class` 是通过关键字 `typedef` 重新命名的类型，可以看出 `Class` 类型本质就是 `struct objc_class *` 类型，即**指向结构体的指针**，也就是说`isa`就是一个指向结构体的**指针**
+  - 而 `NSObject` 是几乎所有类的基类，所以每个对象的内部都会有一个 `isa` 指针
 
 ```objective-c
 @interface NSObject {
-    Class isa;
+    Class isa; // 等价于 struct objc_class * isa
 }
 ...
 @end
@@ -40,7 +40,7 @@ xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc main.m -o mani-arm64.cpp
 typedef struct objc_class *Class;
 ```
 
-- 我们再从生成的 cpp 文件中找到 `NSObject` 的实现：可以看出 `NSObject` 类编译后是通过**结构体**实现的。结构体中有一个成员，就是 `isa`
+- 我们再从生成的 `.cpp` 文件中寻找 `NSObject` 的实现：可以看出  `NSObject` 类编译后是通过**结构体**实现的。结构体中有一个成员，就是 `isa`。
 
 ```objective-c
 struct NSObject_IMPL {
@@ -63,25 +63,25 @@ int main(int argc, const char * argv[]) {
         // 获取 NSObject 类中成员变量所占用的内存大小
         NSLog(@"%zd", class_getInstanceSize([NSObject class])); // 8
         
-        // 获取obj指针所指向的对象占用内存空间大小
+        // 系统为 obj 指针所指向的对象开辟的内存空间大小
         NSLog(@"%zd", malloc_size((__bridge const void *)obj)); // 16
     }
     return 0;
 }
 ```
 
-使用`class_getInstanceSize(Class cls)`这个函数可以查看某个类中**成员变量**所占用的内存空间大小。**注意：返回的是内存对齐之后的成员变量占用内存大小**
+使用 `class_getInstanceSize(Class cls)` 这个函数可以查看某个类中**成员变量**所占用的内存空间大小。**注意：返回的是内存对齐之后的成员变量占用内存大小**
 
-我们从上面已经知道，`NSObject`类中只有一个 `isa` 指针，所以从打印结果看出 `NSObject` 类中的实例是占用8个字节的。
+我们从上面已经知道，`NSObject` 类中只有一个 `isa` 指针，所以从打印结果看出 `NSObject` 类中的实例是占用8个字节的。
 
-使用`extern size_t malloc_size(const void *ptr);`这个函数，是传递一个指针，返回这个指针指向对象所占用的内存空间大小。
+使用 `extern size_t malloc_size(const void *ptr);` 这个函数，是传递一个指针，返回这个指针指向对象所占用的内存空间大小。
 
 **可以发现，系统为`NSObject`的对象分配了16个字节的存储空间，其中前8个字节存放的是isa指针。**
 
 我们可以从`objc4-781`的源码进行一下探索：
 
-- 找到`class_getInstanceSize`函数：（以NSObject类为例）
-  - 调用`alignedInstanceSize`函数
+- 找到`class_getInstanceSize`函数：（以 `NSObject` 类为例）
+  - 先调用`alignedInstanceSize`函数
   - 调用`word_align`函数，传入`unalignedInstanceSize()`，实例对象 `size` 就是8。
   - `word_align`计算结果就是8。
 
