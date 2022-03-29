@@ -12,7 +12,7 @@
 
 ## 二、RunLoop 对象
 
-我们可以通过下面的代码来获取一个 `RunLoop` 对象：
+我们可以通过下面的代码来**获取** `RunLoop` 对象：
 
 ```objective-c
 NSLog(@"%p - %p", CFRunLoopGetCurrent(), CFRunLoopGetMain());
@@ -22,7 +22,7 @@ NSLog(@"%p - %p", [NSRunLoop currentRunLoop], [NSRunLoop mainRunLoop]);
 0x60000262e580 - 0x60000262e580
 ```
 
-- 从打印结果可以看出，当程序运行起来，当前线程的 RunLoop 即主线程的 RunLoop。
+- 从打印结果可以看出，当程序运行起来，当前线程的 `RunLoop` 即主线程的 `RunLoop`。
 
 因为` CoreFoundation` 是开源的，我们可以通过 `CoreFoundation` 源码来探究一下 `RunLoop` 对象是如何创建的。
 
@@ -32,13 +32,14 @@ CFRunLoopRef CFRunLoopGetCurrent(void) {
     CFRunLoopRef rl = (CFRunLoopRef)_CFGetTSD(__CFTSDKeyRunLoop);
 
     if (rl) return rl;
-  	// 调用 _CFRunLoopGet0
+  	// 调用 _CFRunLoopGet0, 传入的参数是 线程
     return _CFRunLoopGet0(pthread_self());
 }
 
 CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
     ...
     // 根据线程，获取 RunLoop 对象
+    // 线程作为字典的 key，RunLoop 对象即 value
     CFRunLoopRef loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
 
     __CFUnlock(&loopsLock);
@@ -48,6 +49,7 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
         __CFLock(&loopsLock);
         loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
         if (!loop) {
+          	// 向字典设置值，线程为 key，RunLoop 对象为 value
             CFDictionarySetValue(__CFRunLoops, pthreadPointer(t), newLoop);
             loop = newLoop;
         }
@@ -61,12 +63,12 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
 
 ```
 
-- 每个 `RunLoop` 对象和线程之间是存在映射的关系的，通过字典来保存他们，字典的 `key` 就是线程，`value` 就是对应的 `RunLoop` 对象
+- 每个 `RunLoop` 对象和线程之间是存在映射的关系的，通过字典来保存他们，字典的 `key` 就是**线程**，`value` 就是对应的 `RunLoop` 对象
 - 如果通过线程没有找到对应的 `RunLoop` 对象，那么就会创建一个，并保存到字典中。
 
 ### 2.1 RunLoop 对象的结构
 
-通过源码，我们发现 `CFRunLoopRef` 本质是 `__CFRunLoop` 结构体。
+通过源码，我们可以发现 `CFRunLoopRef` 本质是 `__CFRunLoop` 结构体。
 
 ```c
 typedef struct CF_BRIDGED_MUTABLE_TYPE(id) __CFRunLoop * CFRunLoopRef;
@@ -118,18 +120,18 @@ struct __CFRunLoopMode {
 我们值得研究的 `mode`，主要包含以下2个：
 
 - `kCFRunLoopDefaultMode`：应用程序默认的 `mode`，通常主线程运行在这个模式里
-- `UITrackingRunLoopMode`：界面滑动时的模式，例如 `ScrollView` 的滑动，目的是保证在滑动时不会被影响。
+- `UITrackingRunLoopMode`：界面滑动时的模式，例如 `ScrollView` 的滑动，目的是保证在滑动时不会被影响
 
-- `source0`: 非基于 port 的处理事件，一般是App内部事件。
-- `source1`：可以监听系统端口和其他线程相互发送消息，能够主动唤醒 `RunLoop`，由操作系统内核进行管理。
-- `timer`：专门处理 `NSTimer`。
-- `observer`：监听器，可以监听 RunLoop 的各种状态。
+- `source0`: 非基于 `port` 的处理事件，一般是 App 内部事件
+- `source1`：可以监听系统端口和其他线程相互发送消息，能够主动唤醒 `RunLoop`，由操作系统内核进行管理
+- `timer`：专门处理 `NSTimer`
+- `observer`：监听器，可以监听 `RunLoop` 的各种状态
 
 ### 2.2 监听 RunLoop 的状态
 
 利用 `observer` 可以监听 `RunLoop` 的各种状态，可以帮助更好理解 `RunLoop`：
 
-下面就是` RunLoop` 的各种状态：
+下面就是 ` RunLoop` 的各种状态：
 
 ```objective-c
 typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
@@ -147,7 +149,9 @@ typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
 
 ```objective-c
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+  	// 创建观察者，对 RunLoop 的状态进行监听
     CFRunLoopObserverRef observer = CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities, true, 0, callback, NULL);
+  	// 监听当前线程的 RunLoop
     CFRunLoopAddObserver(CFRunLoopGetCurrent(), observer, kCFRunLoopCommonModes);
     CFRelease(observer);
 }
@@ -166,22 +170,21 @@ void callback(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *i
         case kCFRunLoopBeforeSources: // 即将处理 sources
             NSLog(@"kCFRunLoopBeforeSources");
             break;
-        case kCFRunLoopAfterWaiting: // 唤醒 RunLoop
+        case kCFRunLoopAfterWaiting: // 结束休眠，唤醒 RunLoop
             NSLog(@"kCFRunLoopAfterWaiting");
             break;
         case kCFRunLoopExit: // 退出 RunLoop
             NSLog(@"kCFRunLoopExit");
             break;
-            
         default:
             break;
     }
 }
 ```
 
-### 2.4 源码分析 RunLoop 的执行流程
+### 2.3 源码分析 RunLoop 的执行流程
 
-通过观察函数调用栈可知道 RunLoop 是从 CFRunLoopRunSpecific() 函数开始的，我们就从该函数开始进行探索。源码内容比较多，包含很多合理性判断和线程安全的代码，我们只研究核心代码即可。
+通过观察函数调用栈可知道 `RunLoop` 是从 `CFRunLoopRunSpecific()` 函数开始的，我们就从该函数开始进行探索。源码内容比较多，包含很多合理性判断和线程安全的代码，我们只研究核心代码即可。
 
 ```c
 SInt32 CFRunLoopRunSpecific(CFRunLoopRef rl, CFStringRef modeName, CFTimeInterval seconds, Boolean returnAfterSourceHandled) {     /* DOES CALLOUT */
@@ -203,7 +206,7 @@ SInt32 CFRunLoopRunSpecific(CFRunLoopRef rl, CFStringRef modeName, CFTimeInterva
 } /* CFRunLoopRunSpecific */
 ```
 
-__CFRunLoopRun 函数就是 RunLoop 如何处理不同 mode 的逻辑。该函数内部有个 do-while 循环，这里就是 RunLoop 一直运行的核心，只要 retVal 返回值是0就继续循环。
+`__CFRunLoopRun` 函数就是 `RunLoop` 如何处理不同 `mode` 的逻辑。该函数内部有个 `do-while` 循环，这里就是 `RunLoop` 一直运行的核心，只要 `retVal` 返回值是0就继续循环。
 
 ```c
 do {
@@ -217,10 +220,10 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
     // 设置 retVal 初始值为 0
     int32_t retVal = 0;
     do {
-        // 处理 Timers
+        // 即将处理 Timers
         if (rlm->_observerMask & kCFRunLoopBeforeTimers) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeTimers);
         
-        // 处理 Sources
+        // 即将处理 Sources
         if (rlm->_observerMask & kCFRunLoopBeforeSources) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeSources);
 
         // 处理 Blocks
