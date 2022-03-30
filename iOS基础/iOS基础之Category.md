@@ -1,20 +1,20 @@
 ## 一、简介
 
-`category` 是 Objective-C 2.0 之后添加的语言特性，`category` 的主要作用是**为已经存在的类添加方法**，我们可以在不知道该类的实现源码的情况下使用 `category` 为其添加方法。
+`Category` 是 Objective-C 2.0 之后添加的语言特性，`Category` 的主要作用是**为已经存在的类添加方法**，我们可以在不知道该类的实现源码的情况下使用 `Category` 为其添加方法。
 
-- 我们可以利用 `category` 把类的实现分开在几个不同的文件中，这样可以减少单个文件的体积。可以把不同的功能组织到不同的 `category` 里使功能单一化。可以由多个开发者共同完成一个类，只需各自创建该类的 `category` 即可。可以按需加载想要的 `category`，比如 `SDWebImage` 中 `UIImageView+WebCache` 和 `UIButton+WebCache`，根据不同需求加载不同的 `category`。
-- 我们还可以在 `category` 声明私有方法。
+- 我们可以利用 `Category` 把类的实现分开在几个不同的文件中，这样可以减少单个文件的体积。可以把不同的功能组织到不同的 `Category` 里使功能单一化。可以由多个开发者共同完成一个类，只需各自创建该类的 `Category` 即可。可以按需加载想要的 `Category`，比如 `SDWebImage` 中 `UIImageView+WebCache` 和 `UIButton+WebCache`，根据不同需求加载不同的 `Category`
+- 我们还可以在 `Category` 声明私有方法
 
 ## 二、Extension 和 Category 对比
 
-- `extension` 是在编译器决定的，它就是类的一部分，在编译期和头文件里的 `@interface` 和 实现文件里的 `@implementation`形成一个完整的类，它伴随类的的产生而产生，随着类的消亡而消亡。`extension` 一般用来隐藏类的私有信息，必须有类的源码才可以为一个类添加 `extension`。所以无法为系统的类添加 `extension`。
-- `category` 是在运行期决定的，`category` 是无法添加实例变量的，`extension` 是可以添加的。
+- `Extension` 是在**编译期**决定的，它就是类的一部分，在编译期和头文件里的 `@interface` 和 实现文件里的 `@implementation`形成一个完整的类，它伴随类的的产生而产生，随着类的消亡而消亡。`Extension` 一般用来隐藏类的私有信息，必须有类的源码才可以为一个类添加 `Extension`。所以无法为系统的类添加 `Extension`。
+- `Category` 是在**运行期**决定的，`Category` 是**无法添加实例变量的**，**注意是实例变量而不是属性**，`Extension` 是可以添加的。
 
 ## 三、Category 的本质
 
 ### 3.1 Category的基本使用
 
-我们首先来看以下 `category`的基本使用：
+我们首先来看以下 `Category` 的基本使用：
 
 ```objective-c
 // Person+Eat.h
@@ -61,7 +61,7 @@
 xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc MyClass.m -o MyClass-arm64.cpp
 ```
 
-编译之后，我们可以发现 `category` 的本质是结构体 `category_t`，无论我们创建了多少个 `category` 最终都会生成 `category_t` 这个结构体，并且 `category` 中的方法、属性、协议都是存储在这个结构体里的。**也就是说在编译期，分类中成员是不会和类合并在一起的**。
+编译之后，我们可以发现 `Category` 的本质是结构体 `category_t`，无论我们创建了多少个 `Category` 最终都会生成 `category_t` 这个结构体，并且 `category` 中的方法、属性、协议都是存储在这个结构体里的。**也就是说在编译期，分类中成员是不会和类合并在一起的**。
 
 ```c
 struct category_t {
@@ -76,14 +76,14 @@ struct category_t {
 
 - `name`：类的名字
 - `cls`：类
-- `instanceMethods` ：`category` 中所有给类添加的实例方法的列表
-- `classMethods`：`category` 中所有给类添加的类方法的列表
-- `protocols`：`category` 中实现的所有协议的列表
-- `instanceProperties`：`category` 中添加的所有属性
+- `instanceMethods` ：`Category` 中所有给类添加的实例方法的列表
+- `classMethods`：`Category` 中所有给类添加的类方法的列表
+- `protocols`：`Category` 中实现的所有协议的列表
+- `instanceProperties`：`Category` 中添加的所有属性
 
-**从 `category` 的定义中可以看到我们可以 添加实例方法，添加类方法，可以实现协议，可以添加属性。**
+**从 `Category` 的定义中可以发现，我们可以添加实例方法，添加类方法，可以实现协议，可以添加属性。**
 
-**不可以添加实例变量**
+**但是，不可以添加实例变量**
 
 我们继续研究下面的编译后的代码：
 
@@ -146,9 +146,9 @@ static struct _category_t _OBJC_$_CATEGORY_Person_$_Eat __attribute__ ((used, se
 
 ### 3.3 运行期的 Category
 
-在研究完编译时期的 `category` 后，我们进而研究运行时期的 `category`
+在研究完编译时期的 `Category` 后，我们进而研究运行时期的 `Category`
 
-在 `objc-runtime-new.mm` 的源码中，我们可以最终找到如何将 `category` 中的方法列表，属性列表，协议列表添加到类中。
+在 `objc-runtime-new.mm` 的源码中，我们可以最终找到如何将 `Category` 中的方法列表，属性列表，协议列表添加到类中。
 
 ```cpp
 static void
@@ -275,17 +275,17 @@ void attachLists(List* const * addedLists, uint32_t addedCount) {
 
 - 在这段源码中，主要关注2个函数 `memmove` 和 `memcpy`。
 - `memmove` 函数的作用是移动内存，将之前的内存向后移动，将原来的方法列表往后移
-- `memcpy` 函数的作用是内存的拷贝，将 `category` 中的方法列表复制到上一步移出来的位置。
+- `memcpy` 函数的作用是内存的拷贝，将 `Category` 中的方法列表复制到上一步移出来的位置。
 
-从上述源码中，可以发现 `category` 的方法并没有替换原来类已有的方法，如果 `category` 和原来类中都有某个同名方法，只不过 `category` 中的方法被放到了新方法列表的前面，在运行时查找方法的时候是按照顺序查找的，一旦找到该方法，就不会向下继续查找了，产生了 `category` 会覆盖原类方法的假象。
+从上述源码中，可以发现 `Category` 的方法**并没有替换原来类已有的方法**，如果 `Category` 和原来类中都有某个同名方法，只不过 `Category` 中的方法被放到了新方法列表的前面，在运行时查找方法的时候，一旦找到该方法，就不会向下继续查找了，产生了 `Category` 会覆盖原类方法的假象。
 
-> 所以我们在 `category` 定义方法的时候都要加上前缀，以避免意外的重名把类本身的方法”覆盖“掉。
+> 所以我们在 `Category` 定义方法的时候通常都要加上前缀，以避免意外的重名把类本身的方法”覆盖“掉。
 
-- 如果多个 `category` 中存在同名的方法，运行时最终调用哪个方法是由编译器决定的，**最后一个参与编译的方法将会先被调用**。
+- 如果多个 `Category` 中存在同名的方法，运行时最终调用哪个方法是由编译器决定的，**最后一个参与编译的方法将会先被调用**。
 
 ## 四、+load 方法
 
-接下来研究一下类和分类中的 `+load` 方法，先看以下的代码：
+接下来研究一下类和分类中的 `+load` 方法的调用，先看以下的代码：
 
 ```objective-c
 // Person.h
@@ -334,7 +334,7 @@ void attachLists(List* const * addedLists, uint32_t addedCount) {
 
 @end
 
-///
+  
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         
@@ -510,7 +510,7 @@ static bool call_category_loads(void)
 通过上面的源码的分析，我们可以得出以下结论：
 
 - `load` 方法的调用顺序问题，首先是调用类中的 `load` 方法并且和编译的顺序没有任何关系，然后是调用分类中的 `load` 方法，分类中的 `load` 方法是按照编译的顺序进行调用
-- 解释了为什么之前的例子中 `Person` 类和分类中的 `load` 方法为什么调用了3次，而 `test` 方法只调用1次。因为 `load` 方法通过函数指针找到函数的内存地址进行的直接调用，而 `+test` 方法通过 `isa` 指针最终找到元类对象中的类方法列表进行的调用，二者调用的本质不一样。
+- 解释了为什么之前的例子中 `Person` 类和分类中的 `load` 方法为什么调用了3次，而 `test` 方法只调用1次。因为 `load` 方法通过函数指针找到函数的内存地址进行的直接调用，而 `+test` 方法通过 `isa` 指针最终找到元类对象中的类方法列表进行的调用（也就是走的消息发送的流程），二者调用的本质不一样。
 
 接下来研究一下存在继承的情况下的 `load` 方法的调用，创建 `Student` 类继承自 `Person` 类，并创建2个分类
 
@@ -752,9 +752,9 @@ void callInitialize(Class cls)
 
 ##  六、Category 和 关联对象
 
-因为 `category` 的结构体中是无法添加实例变量的，此时我们可以借助 `runtime` 的关联对象来实现。
+因为 `Category` 的结构体中是无法添加实例变量的，此时我们可以借助 `runtime` 的关联对象来实现。
 
-如果我们只是在 `category` 中添加属性，默认是只会生成 `getter`  和 `setter` 方法的声明，不会生成 `getter` 和 `setter` 方法的实现和成员变量，所以我们想要使用定义的属性进行取值和赋值的操作，会因为找不到方法实现而崩溃。
+如果我们只是在 `Category` 中添加属性，默认是只会生成 `getter`  和 `setter` 方法的声明，不会生成 `getter` 和 `setter` 方法的实现和成员变量，所以我们想要使用定义的属性进行取值和赋值的操作，会因为找不到方法实现而崩溃。
 
 可以通过关联对象的方式，间接实现取值和赋值的功能：
 
