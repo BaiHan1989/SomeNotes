@@ -1,14 +1,14 @@
 ## 一、简介
 
-`Category` 是 Objective-C 2.0 之后添加的语言特性，`Category` 的主要作用是**为已经存在的类添加方法**，我们可以在不知道该类的实现源码的情况下使用 `Category` 为其添加方法。
+`Category` 是 Objective-C 2.0 之后添加的语言特性，`Category` 的主要作用是**为已经存在的类添加方法**，我们可以在不知道该类的实现源码的情况下使用 `Category` 为其添加额外的方法。
 
 - 我们可以利用 `Category` 把类的实现分开在几个不同的文件中，这样可以减少单个文件的体积。可以把不同的功能组织到不同的 `Category` 里使功能单一化。可以由多个开发者共同完成一个类，只需各自创建该类的 `Category` 即可。可以按需加载想要的 `Category`，比如 `SDWebImage` 中 `UIImageView+WebCache` 和 `UIButton+WebCache`，根据不同需求加载不同的 `Category`
-- 我们还可以在 `Category` 声明私有方法
+- 利用 `Category` 将私有方法公开化，直接调用某个类的私有方法时，编译器会报错，就可以创建一个该类的 `Category` ，在 `Category` 中声明这些私有方法，但不做实现。导入该 `Category` 的头文件就就可以正常调用私有方法了。
 
 ## 二、Extension 和 Category 对比
 
 - `Extension` 是在**编译期**决定的，它就是类的一部分，在编译期和头文件里的 `@interface` 和 实现文件里的 `@implementation`形成一个完整的类，它伴随类的的产生而产生，随着类的消亡而消亡。`Extension` 一般用来隐藏类的私有信息，必须有类的源码才可以为一个类添加 `Extension`。所以无法为系统的类添加 `Extension`。
-- `Category` 是在**运行期**决定的，`Category` 是**无法添加实例变量的**，**注意是实例变量而不是属性**，`Extension` 是可以添加的。
+- `Category` 是在**运行期**决定的，`Category` 中可以添加实例方法，类方法，可以遵守协议，**可以添加属性**，**但是只生成 `setter` 和 `getter` 方法的声明，不生成实现，同样不生成带下划线的成员变量。**
 
 ## 三、Category 的本质
 
@@ -21,13 +21,13 @@
 
 #import "Person.h"
 
-@interface Person (Eat) <NSCopying, NSCoding>
+@interface Person (Eat) <NSCopying, NSCoding> // 遵守了2个协议
 
-- (void)eatBread;
+- (void)eatBread; // 声明实例方法
 
-+ (void)eatFruit;
++ (void)eatFruit; // 声明类方法
 
-@property (nonatomic, assign) int count;
+@property (nonatomic, assign) int count; // 声明属性
 
 @end
 
@@ -48,47 +48,35 @@
 @end
 ```
 
-- 创建了一个 `Person` 的分类，专门实现吃这个功能
-- 这个分类遵守了2个协议，分别为 `NSCopying` 和 `NSCoding`
-- 声明了2个方法，一个实例方法，一个类方法
-- 定义一个 `count` 属性
-
 ### 3.2 编译期的 Category 
 
-我们通过 `clang` 编译器来观察一下在编译期这些代码的本质是什么？
+我们通过 `clang` 编译器来观察一下在编译期 `Category` 的结构
 
 ```shell
 xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc MyClass.m -o MyClass-arm64.cpp
 ```
 
-编译之后，我们可以发现 `Category` 的本质是结构体 `category_t`，无论我们创建了多少个 `Category` 最终都会生成 `category_t` 这个结构体，并且 `category` 中的方法、属性、协议都是存储在这个结构体里的。**也就是说在编译期，分类中成员是不会和类合并在一起的**。
+编译之后，我们可以发现 `Category` 的本质是结构体 `category_t`，无论我们创建了多少个 `Category` 最终都会生成 `category_t` 这个结构体，并且 `category_t` 中的方法、属性、协议都是存储在这个结构体里的。**也就是说在编译期，分类中成员是不会和类合并在一起的**。
 
 ```c
 struct category_t {
-    const char *name;
-    classref_t cls;
-    struct method_list_t *instanceMethods;
-    struct method_list_t *classMethods;
-    struct protocol_list_t *protocols;
-    struct property_list_t *instanceProperties;
+    const char *name;															// 类的名字
+    classref_t cls;																// 关联的类
+    struct method_list_t *instanceMethods;				// 实例方法列表
+    struct method_list_t *classMethods;						// 类方法列表
+    struct protocol_list_t *protocols;						// 协议列表（遵守了多少协议）
+    struct property_list_t *instanceProperties;		// 属性列表
 };
 ```
 
-- `name`：类的名字
-- `cls`：类
-- `instanceMethods` ：`Category` 中所有给类添加的实例方法的列表
-- `classMethods`：`Category` 中所有给类添加的类方法的列表
-- `protocols`：`Category` 中实现的所有协议的列表
-- `instanceProperties`：`Category` 中添加的所有属性
+**从 `category_t` 的定义中可以发现，我们可以添加实例方法，添加类方法，可以实现协议，可以添加属性。**
 
-**从 `Category` 的定义中可以发现，我们可以添加实例方法，添加类方法，可以实现协议，可以添加属性。**
-
-**但是，不可以添加实例变量**
+**但是，不可以添加实例变量，实例变量可以利用 runtime 的关联对象变相的实现**
 
 我们继续研究下面的编译后的代码：
 
 ```cpp
-static struct /*_method_list_t*/ {
+static struct /*_method_list_t*/ { // 实例方法列表结构体
 	unsigned int entsize;  // sizeof(struct _objc_method)
 	unsigned int method_count;
 	struct _objc_method method_list[1];
@@ -98,7 +86,7 @@ static struct /*_method_list_t*/ {
 	{{(struct objc_selector *)"eatBread", "v16@0:8", (void *)_I_Person_Eat_eatBread}}
 };
 
-static struct /*_method_list_t*/ {
+static struct /*_method_list_t*/ { // 类方法列表结构体
 	unsigned int entsize;  // sizeof(struct _objc_method)
 	unsigned int method_count;
 	struct _objc_method method_list[1];
@@ -108,7 +96,7 @@ static struct /*_method_list_t*/ {
 	{{(struct objc_selector *)"eatFruit", "v16@0:8", (void *)_C_Person_Eat_eatFruit}}
 };
 
-static struct /*_protocol_list_t*/ {
+static struct /*_protocol_list_t*/ { // 协议列表结构体
 	long protocol_count;  // Note, this is 32/64 bit
 	struct _protocol_t *super_protocols[2];
 } _OBJC_CATEGORY_PROTOCOLS_$_Person_$_Eat __attribute__ ((used, section ("__DATA,__objc_const"))) = {
@@ -117,7 +105,7 @@ static struct /*_protocol_list_t*/ {
 	&_OBJC_PROTOCOL_NSCoding
 };
 
-static struct /*_prop_list_t*/ {
+static struct /*_prop_list_t*/ { // 属性列表结构体
 	unsigned int entsize;  // sizeof(struct _prop_t)
 	unsigned int count_of_properties;
 	struct _prop_t prop_list[1];
@@ -127,6 +115,7 @@ static struct /*_prop_list_t*/ {
 	{{"count","Ti,N"}}
 };
 
+// category 的结构体
 static struct _category_t _OBJC_$_CATEGORY_Person_$_Eat __attribute__ ((used, section ("__DATA,__objc_const"))) = 
 {
 	"Person",
@@ -186,6 +175,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
     bool isMeta = (flags & ATTACH_METACLASS);
     auto rwe = cls->data()->extAllocIfNeeded();
 
+  	// 遍历所有的 category
     for (uint32_t i = 0; i < cats_count; i++) {
         auto& entry = cats_list[i];
 
@@ -193,6 +183,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
         if ( ) {
             if (mcount == ATTACH_BUFSIZ) {
                 prepareMethodLists(cls, mlists, mcount, NO, fromBundle);
+              	// 方法添加类中
                 rwe->methods.attachLists(mlists, mcount);
                 mcount = 0;
             }
@@ -204,6 +195,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
             entry.cat->propertiesForMeta(isMeta, entry.hi);
         if (proplist) {
             if (propcount == ATTACH_BUFSIZ) {
+              	// 属性添加到类中
                 rwe->properties.attachLists(proplists, propcount);
                 propcount = 0;
             }
@@ -213,6 +205,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
         protocol_list_t *protolist = entry.cat->protocolsForMeta(isMeta);
         if (protolist) {
             if (protocount == ATTACH_BUFSIZ) {
+              	// 协议添加到类中
                 rwe->protocols.attachLists(protolists, protocount);
                 protocount = 0;
             }
@@ -250,8 +243,10 @@ void attachLists(List* const * addedLists, uint32_t addedCount) {
         uint32_t newCount = oldCount + addedCount;
         setArray((array_t *)realloc(array(), array_t::byteSize(newCount)));
         array()->count = newCount;
+      	// 向后移动出空间
         memmove(array()->lists + addedCount, array()->lists, 
                 oldCount * sizeof(array()->lists[0]));
+      	// 将新的方法复制到新的空间中
         memcpy(array()->lists, addedLists, 
                addedCount * sizeof(array()->lists[0]));
     }
@@ -285,7 +280,7 @@ void attachLists(List* const * addedLists, uint32_t addedCount) {
 
 ## 四、+load 方法
 
-接下来研究一下类和分类中的 `+load` 方法的调用，先看以下的代码：
+接下来研究一下类和 `Category` 中的 `+load` 方法的调用，先看以下的代码：
 
 ```objective-c
 // Person.h
@@ -372,10 +367,12 @@ void call_load_methods(void)
     do {
         // 1. Repeatedly call class +loads until there aren't any more
         while (loadable_classes_used > 0) {
+          	// 调用类的 load 方法
             call_class_loads();
         }
 
         // 2. Call category +loads ONCE
+      	// 调用 category 的 load 方法
         more_categories = call_category_loads();
 
         // 3. Run more +loads if there are classes OR more untried categories
@@ -410,6 +407,7 @@ static void call_class_loads(void)
         if (PrintLoading) {
             _objc_inform("LOAD: +[%s load]\n", cls->nameForLogging());
         }
+      	// 调用 load
         (*load_method)(cls, @selector(load));
     }
     
