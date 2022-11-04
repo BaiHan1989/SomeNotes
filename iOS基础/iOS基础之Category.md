@@ -7,8 +7,8 @@
 
 ## 二、Extension 和 Category 对比
 
-- `Extension` 是在**编译期**决定的，它就是类的一部分，在编译期和头文件里的 `@interface` 和 实现文件里的 `@implementation`形成一个完整的类，它伴随类的的产生而产生，随着类的消亡而消亡。`Extension` 一般用来隐藏类的私有信息，必须有类的源码才可以为一个类添加 `Extension`。所以无法为系统的类添加 `Extension`。
-- `Category` 是在**运行期**决定的，`Category` 中可以添加实例方法，类方法，可以遵守协议，**可以添加属性**，**但是只生成 `setter` 和 `getter` 方法的声明，不生成实现，同样不生成带下划线的成员变量。**
+- `Extension` 是在**编译期**决定的，在编译时期将所有的数据合并到类中，它就是类的一部分，在编译期和头文件里的 `@interface` 和 实现文件里的 `@implementation`形成一个完整的类，它伴随类的的产生而产生，随着类的消亡而消亡。`Extension` 一般用来隐藏类的私有信息，必须有类的源码才可以为一个类添加 `Extension`。所以无法为系统的类添加 `Extension`。
+- `Category` 是在**运行期**决定的，在程序运行时把类的所有数据合并到类中，`Category` 中可以添加实例方法，类方法，可以遵守协议，**可以添加属性**，**但是只生成 `setter` 和 `getter` 方法的声明，不生成实现，同样不生成带下划线的成员变量。**
 
 ## 三、Category 的本质
 
@@ -822,3 +822,6 @@ void *objc_destructInstance(id obj)
 }
 ```
 
+## 七、为什么 Category 中的属性不会自动生成 setter 和 getter 方法的实现，不会生成成员变量
+
+因为类的内存布局是在编译时期决定的，而 Category 中是在运行时期才将内容合并到对应的类中，所以在编译时期不会自动生成 setter 和 getter 方法及成员变量。
